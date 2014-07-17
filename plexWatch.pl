@@ -30,6 +30,8 @@ use Encode;
 use JSON;
 use IO::Socket::SSL qw( SSL_VERIFY_NONE);
 
+use File::Temp;
+
 ## windows
 if ($^O eq 'MSWin32') {
 
@@ -817,6 +819,58 @@ sub ConsoleLog() {
 
     }
     return 1;
+}
+
+sub NotifyEXEC() {
+	my $provider = 'EXEC';
+
+    #my $alert = shift;
+	my $info = shift;
+	my ($alert) = &formatAlert($info,$provider);
+
+	my $alert_options = shift;
+
+	if ($provider_452->{$provider}) {
+    	if ($options{'debug'}) { print uc($provider) . " 452: backing off\n"; }
+    	return 0;
+	}
+
+	my %exec = %{$notify->{EXEC}};
+
+	$exec{'room'} = '{user}' if !$exec{'room'};
+
+    if ($exec{'room'} =~ /\{.*\}/) {
+		my $regex = join "|", keys %{$alert_options};
+		$regex = qr/$regex/;
+		$exec{'room'} =~ s/{($regex)}/$alert_options->{$1}/g;
+		$exec{'room'} =~ s/{\w+}//g; ## remove any {word} - templates that failed
+		$exec{'room'} = $appname if !$exec{'room'}; ## replace appname if empty
+	}
+
+	if (!-f  $exec{'script'} ) {
+		$provider_452->{$provider} = 1;
+		print uc($provider) . " failed $alert: setting $provider to back off additional notifications\n";
+		print STDERR "\n$exec{'script'} does not exists\n";
+		return 0;
+	} else {
+		my $filetmp = File::Temp->new();
+			
+		print $filetmp encode_json($info);
+			
+		close $filetmp;
+		
+		my $cmd = $exec{'script'};
+
+		$cmd .= (" " . $exec{'args'}) if $exec{'args'};
+
+		$cmd .= " " . $filetmp->filename;
+
+		system($cmd);
+
+		print uc($provider) . " Notification successfully posted.\n" if $debug;
+		return 1; ## need better error checking here -- no mac, so I can't test it.
+	}
+    	
 }
 
 sub NotifyFile() {
@@ -3399,6 +3453,7 @@ sub GetNotifyfuncs() {
         file => \&NotifyFile,
         GNTP => \&NotifyGNTP,
         EMAIL => \&NotifyEMAIL,
+        EXEC => \&NotifyEXEC
         );
     my $error;
     ## this SHOULD never happen if the code is released -- this is just a reminder for whomever is adding a new provider in config.pl

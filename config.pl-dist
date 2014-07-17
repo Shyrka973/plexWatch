@@ -214,6 +214,17 @@ $notify = {
 
     },
 
+    'EXEC' => {
+        'enabled' => 0,  ## 0 or 1 - set to 1 to enable local EXEC
+        'push_recentlyadded'  => 0,
+        'push_watched'        => 1,
+        'push_watching'       => 1,
+        'push_paused'         => 1,
+        'push_resumed'        => 1,
+        'script'              => "$data_dir/YourScript",
+        'args'                => "",
+    },
+
 };
 
 $push_titles = {
